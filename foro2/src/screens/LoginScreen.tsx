@@ -14,39 +14,53 @@ import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithCredential,
+  signInWithPopup,
 } from "firebase/auth";
 import * as Google from "expo-auth-session/providers/google";
+import { useRouter } from "expo-router";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const router = useRouter();
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: "TU_WEB_CLIENT_ID.apps.googleusercontent.com",
-    iosClientId: "TU_IOS_CLIENT_ID.apps.googleusercontent.com",
-    androidClientId: "TU_ANDROID_CLIENT_ID.apps.googleusercontent.com",
+    clientId:
+      "1092404268201-37s3b3kpjjlcmkipo01jd7tnbndiaed6.apps.googleusercontent.com",
   });
 
   useEffect(() => {
     if (response?.type === "success" && response.authentication) {
-      const idToken = (response.authentication as any).idToken as string;
-      if (!idToken) return;
-
+      const { idToken } = response.authentication;
       const credential = GoogleAuthProvider.credential(idToken);
       signInWithCredential(auth, credential)
-        .then(({ user }) => {
-          Alert.alert("¡Bienvenido con Google!", user.email ?? "");
-        })
+        .then(() => router.replace("/home"))
         .catch((err) => Alert.alert("Error Google", err.message));
     }
-  }, [response]);
+  }, [response, router]);
 
   const loginWithEmail = () => {
     signInWithEmailAndPassword(auth, email.trim(), password)
-      .then(({ user }) => {
-        Alert.alert("¡Bienvenido!", user.email ?? "");
-      })
+      .then(() => router.replace("/home"))
       .catch((err) => Alert.alert("Error", err.message));
+  };
+
+  const loginWithGoogle = async () => {
+    if (Platform.OS === "web") {
+      const provider = new GoogleAuthProvider();
+      try {
+        await signInWithPopup(auth, provider);
+        router.replace("/home");
+      } catch (err: any) {
+        Alert.alert("Error Google (web)", err.message);
+      }
+    } else {
+      if (!request) {
+        Alert.alert("Error", "Google Auth no está listo");
+      } else {
+        promptAsync();
+      }
+    }
   };
 
   return (
@@ -76,8 +90,8 @@ export default function LoginScreen() {
 
       <Button
         title="Entrar con Google"
-        onPress={() => promptAsync()}
-        disabled={!request}
+        onPress={loginWithGoogle}
+        disabled={Platform.OS !== "web" && !request}
         color={Platform.OS === "ios" ? undefined : "#dd4b39"}
       />
     </View>
