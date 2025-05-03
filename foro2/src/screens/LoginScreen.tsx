@@ -1,14 +1,15 @@
-// src/screens/LoginScreen.tsx
 import React, { useState, useEffect } from "react";
 import {
   View,
-  TextInput,
-  Button,
   Text,
+  TextInput,
+  TouchableOpacity,
+  SafeAreaView,
   StyleSheet,
-  Alert,
+  Image,
   Platform,
 } from "react-native";
+import { AntDesign } from "@expo/vector-icons";
 import { auth } from "../firebase/config";
 import {
   signInWithEmailAndPassword,
@@ -22,6 +23,7 @@ import { useRouter } from "expo-router";
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const router = useRouter();
 
   const [request, response, promptAsync] = Google.useAuthRequest({
@@ -34,29 +36,56 @@ export default function LoginScreen() {
       const { idToken } = response.authentication;
       const credential = GoogleAuthProvider.credential(idToken);
       signInWithCredential(auth, credential)
-        .then(() => router.replace("/home"))
-        .catch((err) => Alert.alert("Error Google", err.message));
+        .then(() => {
+          setErrorMessage("");
+          router.replace("/home");
+        })
+        .catch((err) => setErrorMessage("Error con Google: " + err.message));
     }
   }, [response, router]);
 
-  const loginWithEmail = () => {
-    signInWithEmailAndPassword(auth, email.trim(), password)
-      .then(() => router.replace("/home"))
-      .catch((err) => Alert.alert("Error", err.message));
+  const isValidEmail = (email: string) => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
   };
+  
+  const loginWithEmail = () => {
+    if (!email || !password) {
+      setErrorMessage("Por favor, completa todos los campos.");
+      return;
+    }
+  
+    if (!isValidEmail(email)) {
+      setErrorMessage("Correo electrónico inválido.");
+      return;
+    }
+  
+    signInWithEmailAndPassword(auth, email.trim(), password)
+      .then(() => {
+        setErrorMessage("");
+        router.replace("/home");
+      })
+      .catch(() =>
+        setErrorMessage(
+          "Credenciales incorrectas o cuenta no registrada. Intenta nuevamente."
+        )
+      );
+  };
+  
 
   const loginWithGoogle = async () => {
     if (Platform.OS === "web") {
       const provider = new GoogleAuthProvider();
       try {
         await signInWithPopup(auth, provider);
+        setErrorMessage("");
         router.replace("/home");
       } catch (err: any) {
-        Alert.alert("Error Google (web)", err.message);
+        setErrorMessage("Error con Google (web): " + err.message);
       }
     } else {
       if (!request) {
-        Alert.alert("Error", "Google Auth no está listo");
+        setErrorMessage("Google Auth no está listo.");
       } else {
         promptAsync();
       }
@@ -64,49 +93,133 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Foro2 - Iniciar Sesión</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.innerContainer}>
+        <Image
+          source={{ uri: "https://img.icons8.com/clouds/500/user.png" }}
+          style={styles.logo}
+        />
+        <Text style={styles.title}>Bienvenido</Text>
+        <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Correo electrónico"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        value={email}
-        onChangeText={setEmail}
-      />
+        <View style={styles.inputContainer}>
+          <TextInput
+            placeholder="Correo electrónico"
+            placeholderTextColor="#999"
+            value={email}
+            onChangeText={setEmail}
+            style={styles.input}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <TextInput
+            placeholder="Contraseña"
+            placeholderTextColor="#999"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            style={styles.input}
+          />
+        </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Contraseña"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+        {errorMessage !== "" && (
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        )}
 
-      <Button title="Entrar con Email" onPress={loginWithEmail} />
+        <TouchableOpacity style={styles.loginButton} onPress={loginWithEmail}>
+          <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+        </TouchableOpacity>
 
-      <View style={{ height: 20 }} />
+        <Text style={styles.or}>o</Text>
 
-      <Button
-        title="Entrar con Google"
-        onPress={loginWithGoogle}
-        disabled={Platform.OS !== "web" && !request}
-        color={Platform.OS === "ios" ? undefined : "#dd4b39"}
-      />
-    </View>
+        <TouchableOpacity
+          style={styles.googleButton}
+          onPress={loginWithGoogle}
+          disabled={Platform.OS !== "web" && !request}
+        >
+          <AntDesign name="google" size={24} color="#DB4437" />
+          <Text style={styles.googleButtonText}>Iniciar con Google</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 20 },
-  title: { fontSize: 24, marginBottom: 20, textAlign: "center" },
+  container: {
+    flex: 1,
+    backgroundColor: "#f6f9fc",
+  },
+  innerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 30,
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: 30,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#222",
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 30,
+  },
+  inputContainer: {
+    width: "100%",
+    marginBottom: 20,
+  },
   input: {
-    height: 50,
-    borderColor: "#ccc",
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
+    backgroundColor: "#fff",
+    padding: 14,
+    borderRadius: 12,
     marginBottom: 15,
+    borderColor: "#ddd",
+    borderWidth: 1,
+    fontSize: 16,
+  },
+  errorText: {
+    color: "#ff3b30",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  loginButton: {
+    backgroundColor: "#007AFF",
+    padding: 15,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  loginButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  or: {
+    color: "#999",
+    marginVertical: 10,
+  },
+  googleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    padding: 12,
+    borderRadius: 12,
+    borderColor: "#ddd",
+    borderWidth: 1,
+    width: "100%",
+    justifyContent: "center",
+  },
+  googleButtonText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: "#333",
   },
 });
